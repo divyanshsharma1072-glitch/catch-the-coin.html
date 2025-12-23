@@ -4,82 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catch The Coin 💰</title>
+    <title>Catch The Coin 💰🔊</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-            touch-action: none;
-        }
-        #game-container {
-            position: relative;
-            width: 350px;
-            height: 500px;
-            background: #333;
-            border: 4px solid #ffd700;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        #player {
-            position: absolute;
-            bottom: 10px;
-            left: 150px;
-            font-size: 40px;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        .coin {
-            position: absolute;
-            font-size: 30px;
-        }
-        .stats {
-            margin-bottom: 10px;
-            font-size: 20px;
-            font-weight: bold;
-        }
-        #game-over {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9);
-            padding: 20px;
-            text-align: center;
-            border-radius: 10px;
-            z-index: 10;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background: #ffd700;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: none; }
+        #game-container { position: relative; width: 320px; height: 450px; background: #333; border: 3px solid #ffd700; border-radius: 10px; overflow: hidden; }
+        #player { position: absolute; bottom: 10px; left: 140px; font-size: 40px; transition: transform 0.1s; pointer-events: none; }
+        .coin { position: absolute; font-size: 30px; }
+        .stats { font-size: 20px; margin-bottom: 10px; font-weight: bold; }
+        #game-over { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; text-align: center; border-radius: 10px; width: 80%; z-index: 100; }
+        button { padding: 10px 20px; font-size: 16px; background: #ffd700; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
-
-    <div class="stats">
-        Score: <span id="score">0</span> | Time: <span id="time">30</span>
-    </div>
-
+    <div class="stats">Score: <span id="score">0</span> | Time: <span id="time">30</span></div>
     <div id="game-container">
         <div id="player">🛒</div>
         <div id="game-over">
-            <h2>Game Over!</h2>
-            <p>Your Score: <span id="final-score">0</span></p>
-            <button onclick="resetGame()">Play Again</button>
+            <h2>Game Over! 🏁</h2>
+            <p>Score: <span id="final-score">0</span></p>
+            <button onclick="location.reload()">Play Again</button>
         </div>
     </div>
 
@@ -89,90 +32,77 @@
         const scoreElement = document.getElementById('score');
         const timeElement = document.getElementById('time');
         const gameOverScreen = document.getElementById('game-over');
-        const finalScoreElement = document.getElementById('final-score');
+        let score = 0, timeLeft = 30, gameActive = true;
 
-        let score = 0;
-        let timeLeft = 30;
-        let gameActive = true;
+        // --- Sound Logic ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playCoinSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
 
-        // Player movement (Mouse & Touch)
-        container.addEventListener('mousemove', (e) => {
+        // --- Movement ---
+        const move = (e) => {
             if (!gameActive) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             let rect = container.getBoundingClientRect();
-            let x = e.clientX - rect.left - 20;
-            if (x > 0 && x < 310) {
-                player.style.left = x + 'px';
-            }
-        });
+            let x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left - 20;
+            if (x > 0 && x < 280) player.style.left = x + 'px';
+        };
+        container.addEventListener('mousemove', move);
+        container.addEventListener('touchmove', move);
 
-        container.addEventListener('touchmove', (e) => {
-            if (!gameActive) return;
-            let rect = container.getBoundingClientRect();
-            let x = e.touches[0].clientX - rect.left - 20;
-            if (x > 0 && x < 310) {
-                player.style.left = x + 'px';
-            }
-        });
-
-        function createCoin() {
+        // --- Coin Logic ---
+        function spawn() {
             if (!gameActive) return;
             const coin = document.createElement('div');
             coin.className = 'coin';
             coin.innerHTML = '💰';
-            coin.style.left = Math.random() * 310 + 'px';
+            coin.style.left = Math.random() * 280 + 'px';
             coin.style.top = '0px';
             container.appendChild(coin);
 
             let pos = 0;
             const fall = setInterval(() => {
-                if (!gameActive) {
-                    clearInterval(fall);
-                    coin.remove();
-                }
+                if (!gameActive) { clearInterval(fall); coin.remove(); return; }
                 pos += 5;
                 coin.style.top = pos + 'px';
 
-                // Check collision
                 let pRect = player.getBoundingClientRect();
                 let cRect = coin.getBoundingClientRect();
 
-                if (cRect.bottom >= pRect.top && 
-                    cRect.right >= pRect.left && 
-                    cRect.left <= pRect.right) {
+                if (cRect.bottom >= pRect.top && cRect.right >= pRect.left && cRect.left <= pRect.right) {
                     score++;
                     scoreElement.innerText = score;
+                    playCoinSound(); // Aawaz bajegi!
                     clearInterval(fall);
                     coin.remove();
                 }
-
-                if (pos > 500) {
-                    clearInterval(fall);
-                    coin.remove();
-                }
+                if (pos > 450) { clearInterval(fall); coin.remove(); }
             }, 20);
         }
 
-        const coinInterval = setInterval(createCoin, 800);
-
+        const gameInterval = setInterval(spawn, 800);
         const timer = setInterval(() => {
             timeLeft--;
             timeElement.innerText = timeLeft;
             if (timeLeft <= 0) {
-                endGame();
+                gameActive = false;
+                clearInterval(timer);
+                clearInterval(gameInterval);
+                document.getElementById('final-score').innerText = score;
+                gameOverScreen.style.display = 'block';
             }
         }, 1000);
-
-        function endGame() {
-            gameActive = false;
-            clearInterval(timer);
-            clearInterval(coinInterval);
-            finalScoreElement.innerText = score;
-            gameOverScreen.style.display = 'block';
-        }
-
-        function resetGame() {
-            location.reload();
-        }
     </script>
 </body>
 </html>
